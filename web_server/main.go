@@ -36,7 +36,7 @@ func main(){
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request){
-	fmt.Fprintf(w, "Hello");
+	http.Redirect(w, r, "/users", http.StatusPermanentRedirect)
 }
 func getUser(w http.ResponseWriter, r *http.Request){
 	id, err := strconv.Atoi(r.PathValue("id"));
@@ -48,15 +48,18 @@ func getUser(w http.ResponseWriter, r *http.Request){
 	var user User
 	if err != nil{
 		http.Error(w, err.Error(), http.StatusNotFound)
+		return
 	}
 	for res.Next(){
 		if err := res.Scan(&user.ID, &user.Name, &user.Email); err != nil{
 		  http.Error(w, err.Error(), http.StatusInternalServerError)
+		  return
 		}
 	}
 	userJson, err := json.Marshal(user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
     w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusFound)
@@ -71,11 +74,13 @@ func getUsers(w http.ResponseWriter, r *http.Request){
 
 	if err != nil{
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
     for res.Next(){
 		var user User
 		if err := res.Scan(&user.ID, &user.Name, &user.Email); err != nil{
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	
 		users = append(users, user)
@@ -83,6 +88,7 @@ func getUsers(w http.ResponseWriter, r *http.Request){
 	usersJson, err := json.Marshal(users)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
     w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -93,19 +99,23 @@ func createUser(w http.ResponseWriter,r *http.Request){
 	var user User
 	err := json.NewDecoder(r.Body).Decode(&user);
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest);
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	if user.Name == ""{
 		http.Error(w, "Name is required.", http.StatusBadRequest)
+		return
 	}
 	if user.Email == ""{
 		http.Error(w, "Email is required.", http.StatusBadRequest)
+		return
 	}
 
   	hashed, err := hashPassword(user.Password)
 
 	if err != nil{
 		http.Error(w, "Email is required.", http.StatusInternalServerError)
+		return
 	}
 
     sqlStmt := "insert into users(name, email, password) values(?, ?, ?);"
@@ -116,6 +126,7 @@ func createUser(w http.ResponseWriter,r *http.Request){
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -125,6 +136,7 @@ func deleteUser(w http.ResponseWriter, r *http.Request){
 	
     if err != nil {
 		http.Error(w, "ID must be an integer", http.StatusBadRequest)
+		return
 	}
   	sqlStmt := "delete from users where id = ? or email = ?;"
 	
@@ -139,13 +151,15 @@ func updateUser(w http.ResponseWriter, r *http.Request){
 	id, err := strconv.Atoi(r.PathValue("id"))
     if err != nil {
 		http.Error(w, "ID must be an integer", http.StatusBadRequest)
+		return
 	}
 
 	var user User
 	err = json.NewDecoder(r.Body).Decode(&user)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest);
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
   	sqlStmt := fmt.Sprintf("update %s set name = ?, email = ? where id = ?", tableName)
